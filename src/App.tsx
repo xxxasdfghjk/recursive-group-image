@@ -16,7 +16,7 @@ export default function App() {
     return (
         <div className="p-4">
             <input type="file" accept="image/*" onChange={handleFileChange} />
-            {image && <CanvasDisplay image={image} steps={1000} />}
+            {image && <CanvasDisplay image={image} steps={6000} />}
         </div>
     );
 }

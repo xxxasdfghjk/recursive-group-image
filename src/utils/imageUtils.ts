@@ -50,7 +50,7 @@ export function computeVariance(
         accumulateSquare[y][x];
     const pixels = width * height;
     const mean = sumLuminous / pixels;
-    return sumLuminousSquare - 2 * sumLuminous * mean + pixels * mean * mean;
+    return pixels + sumLuminousSquare - 2 * sumLuminous * mean + pixels * mean * mean;
 }
 
 export function fillRegionWithAvgColor(
@@ -81,11 +81,13 @@ export function splitAndAnalyze(
         for (let dy = 0; dy < 2; dy++) {
             const sx = dx * halfWidth;
             const sy = dy * halfHeight;
+            const widthRest = dx !== 0 && width % 2 == 1 ? 1 : 0;
+            const heightRest = dy !== 0 && height % 2 == 1 ? 1 : 0;
             subRegions.push({
                 x: x + sx,
                 y: y + sy,
-                width: halfWidth,
-                height: halfHeight,
+                width: halfWidth + widthRest,
+                height: halfHeight + heightRest,
                 variance: computeVariance(
                     x + sx,
                     y + sy,
@@ -165,25 +167,26 @@ export async function runSegmentationSteps(image: HTMLImageElement, canvas: HTML
         canvas.height
     );
     const accumulateRGB = calcAccumulateRGB(baseImageData.data, canvas.width, canvas.height);
-    const regions: Region[] = [
-        {
-            x: 0,
-            y: 0,
-            width,
-            height,
-            variance: computeVariance(0, 0, canvas.width, canvas.height, luminousAccumulate, luminousSquareAccumulate),
-        },
-    ];
-    const priorityQueue = new PriorityQueue(regions, (e1, e2) => {
+    const initialRegion = {
+        x: 0,
+        y: 0,
+        width,
+        height,
+        variance: computeVariance(0, 0, canvas.width, canvas.height, luminousAccumulate, luminousSquareAccumulate),
+    };
+    const subRegions = splitAndAnalyze(initialRegion, luminousAccumulate, luminousSquareAccumulate);
+    subRegions.forEach((top) => {
+        fillRegionWithAvgColor(ctx, top.x, top.y, top.width, top.height, accumulateRGB);
+    });
+    const priorityQueue = new PriorityQueue(subRegions, (e1, e2) => {
         return e2.variance - e1.variance;
     });
+
     for (let step = 0; step < steps; step++) {
         const region = priorityQueue.pop();
+        fillRegionWithAvgColor(ctx, region.x, region.y, region.width, region.height, accumulateRGB);
         const subRegions = splitAndAnalyze(region, luminousAccumulate, luminousSquareAccumulate);
-        subRegions.forEach((r) => {
-            fillRegionWithAvgColor(ctx, r.x, r.y, r.width, r.height, accumulateRGB);
-        });
         priorityQueue.push(...subRegions);
-        await new Promise((res) => setTimeout(res, 200));
+        await new Promise((res) => setTimeout(res, 10));
     }
 }
