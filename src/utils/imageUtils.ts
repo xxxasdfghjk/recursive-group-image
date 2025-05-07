@@ -64,6 +64,9 @@ export function fillRegionWithAvgColor(
     const [r, g, b] = computeAvgColor(x, y, width, height, accumulateRGB);
     ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, width, height);
 }
 
 export function splitAndAnalyze(
