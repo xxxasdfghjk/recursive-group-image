@@ -157,30 +157,58 @@ const calcAccumulate = (imageData: Uint8ClampedArray<ArrayBufferLike>, width: nu
     return { luminousAccumulate: dp, luminousSquareAccumulate: dpsquare };
 };
 
-export async function runSegmentationSteps(image: HTMLImageElement, canvas: HTMLCanvasElement, steps: number) {
+export async function runSegmentationSteps(
+    image: HTMLImageElement,
+    canvas: HTMLCanvasElement,
+    steps: number,
+    incrementProgress: () => void,
+    waitTime: number = 10,
+    initRegion: Region[] = []
+) {
     const ctx = canvas.getContext("2d")!;
     const width = canvas.width;
     const height = canvas.height;
+    if (initRegion.length === 0) {
+        ctx.drawImage(image, 0, 0, width, height);
+    }
+    const copyCanvas = document.createElement("canvas");
+    copyCanvas.width = width;
+    copyCanvas.height = height;
+    const copyCtx = copyCanvas.getContext("2d")!;
+    copyCtx.drawImage(image, 0, 0, width, height);
 
-    ctx.drawImage(image, 0, 0, width, height);
-    const baseImageData = ctx.getImageData(0, 0, width, height);
+    const baseImageData = copyCtx.getImageData(0, 0, width, height);
     const { luminousAccumulate, luminousSquareAccumulate } = calcAccumulate(
         baseImageData.data,
         canvas.width,
         canvas.height
     );
     const accumulateRGB = calcAccumulateRGB(baseImageData.data, canvas.width, canvas.height);
-    const initialRegion = {
-        x: 0,
-        y: 0,
-        width,
-        height,
-        variance: computeVariance(0, 0, canvas.width, canvas.height, luminousAccumulate, luminousSquareAccumulate),
-    };
-    const subRegions = splitAndAnalyze(initialRegion, luminousAccumulate, luminousSquareAccumulate);
-    subRegions.forEach((top) => {
-        fillRegionWithAvgColor(ctx, top.x, top.y, top.width, top.height, accumulateRGB);
-    });
+    const subRegions: Region[] = (() => {
+        if (initRegion.length > 0) {
+            return initRegion;
+        } else {
+            const initialRegion = {
+                x: 0,
+                y: 0,
+                width,
+                height,
+                variance: computeVariance(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height,
+                    luminousAccumulate,
+                    luminousSquareAccumulate
+                ),
+            };
+            const subRegions = splitAndAnalyze(initialRegion, luminousAccumulate, luminousSquareAccumulate);
+            subRegions.forEach((top) => {
+                fillRegionWithAvgColor(ctx, top.x, top.y, top.width, top.height, accumulateRGB);
+            });
+            return subRegions;
+        }
+    })();
     const priorityQueue = new PriorityQueue(subRegions, (e1, e2) => {
         return e2.variance - e1.variance;
     });
@@ -188,8 +216,10 @@ export async function runSegmentationSteps(image: HTMLImageElement, canvas: HTML
     for (let step = 0; step < steps; step++) {
         const region = priorityQueue.pop();
         fillRegionWithAvgColor(ctx, region.x, region.y, region.width, region.height, accumulateRGB);
+        incrementProgress();
         const subRegions = splitAndAnalyze(region, luminousAccumulate, luminousSquareAccumulate);
         priorityQueue.push(...subRegions);
-        await new Promise((res) => setTimeout(res, 10));
+        await new Promise((res) => setTimeout(res, waitTime));
     }
+    return priorityQueue.getInternalArray();
 }

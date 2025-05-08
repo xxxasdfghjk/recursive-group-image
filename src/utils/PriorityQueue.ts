@@ -26,4 +26,7 @@ export class PriorityQueue<T> {
     length() {
         return this.queue.length;
     }
+    getInternalArray() {
+        return this.queue;
+    }
 }
