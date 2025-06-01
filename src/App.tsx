@@ -9,7 +9,7 @@ export default function App() {
     const [image, setImage] = useState<HTMLImageElement | null>(null);
     const [step, setStep] = useState(500);
     const [currentStep, setCurrentStep] = useState(0);
-    const [waitTime, setWaitTime] = useState(30);
+    const waitTime = 30;
 
     const [progress, setProgress] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
